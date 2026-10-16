@@ -43,7 +43,7 @@ export async function SiteFooter() {
     <footer className="bg-night text-paper/75">
       <div className="container-page grid grid-cols-1 gap-12 py-16 md:grid-cols-12">
         <div className="md:col-span-5">
-          <Wordmark name={business.name} tone="light" />
+          <Wordmark name={business.name} tone="light" size={48} />
           <p className="mt-5 max-w-sm text-[0.9375rem] leading-relaxed">{business.tagline}</p>
           {business.offices.length > 0 && (
             <ul className="mt-6 space-y-3 text-sm">

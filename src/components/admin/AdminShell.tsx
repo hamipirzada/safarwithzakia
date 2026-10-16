@@ -245,7 +245,7 @@ export function AdminShell({ nav, user, initialCollapsed, children }: { nav: Adm
             {collapsed ? (
               <svg aria-hidden width="26" height="18" viewBox="0 0 26 18" fill="none"><path d="M1 17 8.5 5l4 6 3.5-4.5L25 17" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M8.5 5 10.6 8.3" stroke="var(--color-saffron)" strokeWidth="1.6" strokeLinecap="round" /></svg>
             ) : (
-              <Wordmark name="Admin" tone="light" />
+              <Wordmark name="Admin" tone="light" size={32} />
             )}
           </Link>
         </div>
@@ -268,7 +268,7 @@ export function AdminShell({ nav, user, initialCollapsed, children }: { nav: Adm
 
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between bg-night px-4 text-paper lg:hidden">
-        <Link href="/admin" aria-label="Admin dashboard"><Wordmark name="Admin" tone="light" /></Link>
+        <Link href="/admin" aria-label="Admin dashboard"><Wordmark name="Admin" tone="light" size={32} /></Link>
         <button
           ref={menuButtonRef}
           type="button"
@@ -288,7 +288,7 @@ export function AdminShell({ nav, user, initialCollapsed, children }: { nav: Adm
           <div aria-hidden data-testid="drawer-backdrop" className="absolute inset-0 bg-night/60" onClick={closeDrawer} />
           <div ref={drawerRef} id="admin-drawer" role="dialog" aria-modal="true" aria-label="Admin navigation" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-night text-paper shadow-2xl">
             <div className="flex h-14 items-center justify-between px-4">
-              <Wordmark name="Admin" tone="light" />
+              <Wordmark name="Admin" tone="light" size={32} />
               <button type="button" onClick={closeDrawer} aria-label="Close navigation" className="inline-flex h-10 w-10 items-center justify-center rounded-md hover:bg-paper/10 focus-visible:outline-2 focus-visible:outline-saffron">
                 <X aria-hidden size={20} />
               </button>
