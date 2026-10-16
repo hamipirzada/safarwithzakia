@@ -1,0 +1,15 @@
+.git
+.next
+node_modules
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+blob-report
+.agents
+.claude
+.windsurf
+skills-lock.json
+src/generated
+.next-e2e

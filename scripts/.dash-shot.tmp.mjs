@@ -1,0 +1,28 @@
+import { chromium, devices } from "@playwright/test";
+const out = process.argv[2];
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message)); page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+await page.goto("http://localhost:3000/admin/login");
+await page.fill("#email", "admin@example.test"); await page.fill("#password", "dev-admin-password-123");
+await page.click("button[type=submit]"); await page.waitForURL("**/admin");
+await page.goto("http://localhost:3000/admin?range=90d", { waitUntil: "networkidle" });
+await page.screenshot({ path: `${out}/expanded.png`, fullPage: true });
+const svg = page.locator("svg[data-chart=trend]");
+if (await svg.count()) { await svg.hover({ position: { x: 300, y: 100 } }); await page.waitForTimeout(200); await page.screenshot({ path: `${out}/tooltip.png`, clip: { x: 240, y: 300, width: 1200, height: 420 } }); }
+await page.getByRole("button", { name: "Collapse sidebar" }).click();
+await page.goto("http://localhost:3000/admin/enquiries", { waitUntil: "networkidle" });
+await page.getByRole("link", { name: /^Packages/ }).first().hover(); await page.waitForTimeout(250);
+await page.screenshot({ path: `${out}/collapsed.png`, clip: { x: 0, y: 0, width: 1440, height: 700 } });
+console.log("sidebar after reload:", await page.locator("aside[data-sidebar]").getAttribute("data-sidebar"));
+await page.getByRole("button", { name: "Expand sidebar" }).click(); await page.waitForTimeout(300);
+const m = await browser.newContext({ ...devices["Pixel 7"], storageState: await ctx.storageState() });
+const mp = await m.newPage();
+await mp.goto("http://localhost:3000/admin", { waitUntil: "networkidle" });
+await mp.screenshot({ path: `${out}/mobile.png`, fullPage: false });
+await mp.getByRole("button", { name: "Open navigation" }).click(); await mp.waitForTimeout(200);
+await mp.screenshot({ path: `${out}/mobile-drawer.png` });
+console.log("errors:", errors);
+await browser.close();

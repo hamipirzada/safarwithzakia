@@ -9,10 +9,20 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-e2e/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "src/generated/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
+  {
+    rules: {
+      // Leading underscore marks intentionally unused values (e.g. omitted fields in destructuring).
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true }],
+    },
+  },
 ]);
 
 export default eslintConfig;

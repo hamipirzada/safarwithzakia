@@ -1,26 +1,221 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Safar With Zakia — design tokens.
+ * Derived from the reference site's identity (deep navy + saffron gold) and refined toward an
+ * editorial palette: warm paper, slate ink, a single saffron accent used sparingly, and a
+ * Dal Lake teal for secondary cues. See docs/TECHNICAL_DECISIONS.md (TD-08).
+ */
+@theme {
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  --color-ink: #16212c;
+  --color-ink-soft: #2b3946;
+  --color-muted: #5a6470;
+  --color-faint: #8a929b;
+  --color-paper: #f6f2ea;
+  --color-paper-deep: #ece5d8;
+  --color-surface: #fffdf9;
+  --color-line: #ddd4c3;
+  --color-line-strong: #c7bca8;
+  --color-saffron: #c8921d;
+  --color-saffron-soft: #f3e3bd;
+  --color-saffron-ink: #7a5508;
+  --color-lake: #2e5c63;
+  --color-lake-soft: #dbe8e7;
+  --color-night: #0d1822;
+  --color-success: #2f6b45;
+  --color-success-soft: #e1efe5;
+  --color-danger: #a23b2a;
+  --color-danger-soft: #f6e1dc;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #f8ecd0;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --shadow-card: 0 1px 2px rgb(22 33 44 / 0.06), 0 8px 24px -12px rgb(22 33 44 / 0.18);
+
+  --ease-out-soft: cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01";
+  }
+  ::selection {
+    background: var(--color-saffron-soft);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-lake);
+    outline-offset: 2px;
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
+  }
+  a {
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: 1px;
+  }
+  input, select, textarea, button {
+    font: inherit;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 76rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container-page { padding-inline: 1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .container-page { padding-inline: 2rem; }
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-saffron-ink);
+  }
+
+  /* Long-form text */
+  .prose-safar {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: var(--color-ink-soft);
+  }
+  .prose-safar > * + * { margin-top: 1em; }
+  .prose-safar h2 { font-size: 1.5rem; line-height: 1.25; color: var(--color-ink); margin-top: 2em; }
+  .prose-safar h3 { font-size: 1.2rem; color: var(--color-ink); margin-top: 1.6em; }
+  .prose-safar ul { list-style: disc; padding-left: 1.25rem; }
+  .prose-safar a { color: var(--color-lake); text-decoration: underline; }
+
+  /* Form controls */
+  .field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink);
+    margin-bottom: 0.375rem;
+  }
+  .field-hint {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.375rem;
+  }
+  .field-error {
+    font-size: 0.8125rem;
+    color: var(--color-danger);
+    margin-top: 0.375rem;
+  }
+  .input {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    padding: 0.55rem 0.75rem;
+    color: var(--color-ink);
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .input::placeholder { color: var(--color-faint); }
+  .input:hover { border-color: var(--color-muted); }
+  .input:focus { outline: none; border-color: var(--color-lake); box-shadow: 0 0 0 3px rgb(46 92 99 / 0.18); }
+  .input[aria-invalid="true"] { border-color: var(--color-danger); }
+  .input:disabled { background: var(--color-paper-deep); color: var(--color-muted); }
+  textarea.input { min-height: 7rem; resize: vertical; }
+  select.input {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235a6470' stroke-width='1.6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.6rem 1.15rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: background-color 150ms, color 150ms, border-color 150ms;
+    cursor: pointer;
+    /* Labels can include content names (e.g. "Plan a trip with …"), so let them wrap on phones. */
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary { background: var(--color-ink); color: var(--color-paper); }
+  .btn-primary:hover:not(:disabled) { background: var(--color-ink-soft); }
+  .btn-accent { background: var(--color-saffron); color: var(--color-night); }
+  .btn-accent:hover:not(:disabled) { background: #d8a22d; }
+  .btn-secondary { background: transparent; color: var(--color-ink); border: 1px solid var(--color-line-strong); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--color-ink); }
+  .btn-ghost { background: transparent; color: var(--color-ink); }
+  .btn-ghost:hover:not(:disabled) { background: var(--color-paper-deep); }
+  .btn-danger { background: var(--color-danger); color: #fff; }
+  .btn-danger:hover:not(:disabled) { background: #8a2f20; }
+  .btn-sm { min-height: 2.25rem; padding: 0.4rem 0.8rem; font-size: 0.875rem; }
+  .btn-on-dark { background: var(--color-paper); color: var(--color-ink); }
+  .btn-on-dark:hover { background: #fff; }
+  .btn-outline-on-dark { border: 1px solid rgb(246 242 234 / 0.5); color: var(--color-paper); }
+  .btn-outline-on-dark:hover { border-color: var(--color-paper); background: rgb(246 242 234 / 0.08); }
+
+  .link {
+    color: var(--color-lake);
+    text-decoration: underline;
+  }
+  .link:hover { color: var(--color-ink); }
+
+  .rule-accent {
+    display: block;
+    width: 2.5rem;
+    height: 2px;
+    background: var(--color-saffron);
+  }
+}
+
+/* Dashboard chart entry animations (neutralised by the reduced-motion rule below). */
+@keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes chart-fade { from { opacity: 0; } }
+@keyframes bar-grow { from { transform: scaleX(0); } }
+@keyframes col-grow { from { transform: scaleY(0); } }
+.chart-draw { stroke-dasharray: 1; animation: chart-draw 900ms cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+.chart-fade { animation: chart-fade 700ms ease-out both; }
+.bar-grow { transform-origin: left; animation: bar-grow 650ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.col-grow { transform-origin: bottom; animation: col-grow 650ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

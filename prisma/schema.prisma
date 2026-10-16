@@ -1,0 +1,660 @@
+// Safar With Zakia — relational schema.
+// Migrations in prisma/migrations are the source of truth for the database.
+// Money is stored as integer paise (INR minor units). See docs/ARCHITECTURE.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Staff accounts & authentication (tables used by Better Auth) ─────────────
+
+enum Role {
+  ADMIN // full access, manages staff, settings, email connection, deletion/export
+  STAFF // manages enquiries and website content
+}
+
+/// Staff account. There are no public/customer accounts.
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  role          Role     @default(STAFF)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions          Session[]
+  accounts          Account[]
+  assignedEnquiries Enquiry[]              @relation("EnquiryAssignee")
+  enquiryNotes      EnquiryNote[]
+  statusChanges     EnquiryStatusHistory[]
+  auditLogs         AuditLog[]
+
+  @@map("staff_user")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("auth_session")
+}
+
+model Account {
+  id                    String    @id @default(uuid()) @db.Uuid
+  accountId             String
+  providerId            String
+  userId                String    @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("auth_account")
+}
+
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verification")
+}
+
+/// Better Auth's login/password-reset rate limiter (database storage so it works across instances).
+model RateLimit {
+  id          String @id @default(uuid()) @db.Uuid
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("auth_rate_limit")
+}
+
+/// Fixed-window throttle for public form submissions.
+model RequestThrottle {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+
+  @@map("request_throttle")
+}
+
+// ─── Media ───────────────────────────────────────────────────────────────────
+
+/// A locally hosted image under /public/images with its licence and credit.
+model MediaAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  path       String   @unique
+  alt        String
+  width      Int
+  height     Int
+  credit     String?
+  license    String?
+  licenseUrl String?
+  sourceUrl  String?
+  createdAt  DateTime @default(now())
+
+  destinationHeroes Destination[]      @relation("DestinationHero")
+  packageHeroes     Package[]          @relation("PackageHero")
+  destinationImages DestinationImage[]
+  packageImages     PackageImage[]
+
+  @@map("media_asset")
+}
+
+// ─── Catalogue ───────────────────────────────────────────────────────────────
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Destination {
+  id                  String            @id @default(uuid()) @db.Uuid
+  slug                String            @unique
+  name                String
+  region              String?
+  summary             String
+  description         String
+  bestSeason          String?
+  recommendedDuration String?
+  travelTips          String?
+  heroImageId         String?           @db.Uuid
+  heroImage           MediaAsset?       @relation("DestinationHero", fields: [heroImageId], references: [id], onDelete: SetNull)
+  status              PublicationStatus @default(DRAFT)
+  sortOrder           Int               @default(0)
+  seoTitle            String?
+  seoDescription      String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  attractions  Attraction[]
+  images       DestinationImage[]
+  packages     PackageDestination[]
+  pricingRules PricingRule[]
+  enquiries    EnquiryDestination[]
+
+  @@index([status, sortOrder])
+  @@map("destination")
+}
+
+model DestinationImage {
+  destinationId String      @db.Uuid
+  mediaId       String      @db.Uuid
+  position      Int
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  media         MediaAsset  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([destinationId, mediaId])
+  @@map("destination_image")
+}
+
+model Attraction {
+  id            String      @id @default(uuid()) @db.Uuid
+  destinationId String      @db.Uuid
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  position      Int
+
+  @@index([destinationId, position])
+  @@map("attraction")
+}
+
+model Package {
+  id                 String            @id @default(uuid()) @db.Uuid
+  slug               String            @unique
+  title              String
+  category           String?
+  summary            String
+  description        String
+  durationDays       Int
+  durationNights     Int
+  idealFor           String?
+  accommodationInfo  String?
+  transportInfo      String?
+  availabilityNotes  String?
+  cancellationPolicy String?
+  heroImageId        String?           @db.Uuid
+  heroImage          MediaAsset?       @relation("PackageHero", fields: [heroImageId], references: [id], onDelete: SetNull)
+  status             PublicationStatus @default(DRAFT)
+  featured           Boolean           @default(false)
+  sortOrder          Int               @default(0)
+  seoTitle           String?
+  seoDescription     String?
+  publishedAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  destinations PackageDestination[]
+  itinerary    ItineraryDay[]
+  images       PackageImage[]
+  features     PackageFeature[]
+  pricingRules PricingRule[]
+  addons       PackageAddon[]
+  offers       Offer[]
+  enquiries    Enquiry[]
+
+  @@index([status, featured, sortOrder])
+  @@map("package")
+}
+
+model PackageDestination {
+  id            String      @id @default(uuid()) @db.Uuid
+  packageId     String      @db.Uuid
+  destinationId String      @db.Uuid
+  position      Int
+  days          Int
+  package       Package     @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+
+  @@unique([packageId, position])
+  @@index([destinationId])
+  @@map("package_destination")
+}
+
+model ItineraryDay {
+  id          String  @id @default(uuid()) @db.Uuid
+  packageId   String  @db.Uuid
+  package     Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  dayNumber   Int
+  title       String
+  description String
+  overnight   String?
+
+  @@unique([packageId, dayNumber])
+  @@map("itinerary_day")
+}
+
+model PackageImage {
+  packageId String     @db.Uuid
+  mediaId   String     @db.Uuid
+  position  Int
+  package   Package    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, mediaId])
+  @@map("package_image")
+}
+
+enum FeatureKind {
+  INCLUDED
+  EXCLUDED
+}
+
+/// Inclusions and exclusions share one table (see docs/ARCHITECTURE.md).
+model PackageFeature {
+  id        String      @id @default(uuid()) @db.Uuid
+  packageId String      @db.Uuid
+  package   Package     @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  kind      FeatureKind
+  text      String
+  position  Int
+
+  @@index([packageId, kind, position])
+  @@map("package_feature")
+}
+
+// ─── Pricing ─────────────────────────────────────────────────────────────────
+
+/// How an amount is applied. Every price in the system carries one of these.
+enum PricingBasis {
+  PER_PERSON // once per traveller
+  PER_GROUP // once per enquiry/travelling party
+  PER_PERSON_PER_DAY // per traveller, per day
+  PER_GROUP_PER_DAY // per travelling party (e.g. vehicle), per day
+  PER_PACKAGE // flat package price covering `includedTravellers`
+}
+
+/// A price for a destination (custom trips) or a package. Exactly one owner (DB check constraint).
+/// Seasonal rules (seasonStart/seasonEnd, "MM-DD") take precedence over all-year rules.
+model PricingRule {
+  id                 String       @id @default(uuid()) @db.Uuid
+  destinationId      String?      @db.Uuid
+  packageId          String?      @db.Uuid
+  destination        Destination? @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  package            Package?     @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  label              String
+  basis              PricingBasis
+  amountPaise        Int
+  /// Per-child amount. When null and children travel on a per-person basis, a quote is required.
+  childAmountPaise   Int?
+  /// Number of travellers a PER_PACKAGE price covers.
+  includedTravellers Int?
+  seasonStart        String?
+  seasonEnd          String?
+  validFrom          DateTime?    @db.Date
+  validTo            DateTime?    @db.Date
+  active             Boolean      @default(false)
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([destinationId, active])
+  @@index([packageId, active])
+  @@map("pricing_rule")
+}
+
+model PackageAddon {
+  id          String       @id @default(uuid()) @db.Uuid
+  packageId   String       @db.Uuid
+  package     Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  basis       PricingBasis
+  amountPaise Int
+  active      Boolean      @default(true)
+  position    Int
+
+  @@index([packageId, position])
+  @@map("package_addon")
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+model PromoCode {
+  id               String       @id @default(uuid()) @db.Uuid
+  /// Stored upper-case.
+  code             String       @unique
+  description      String?
+  discountType     DiscountType
+  /// Whole percent (1–100) for PERCENT, paise for FIXED.
+  value            Int
+  minSubtotalPaise Int?
+  maxDiscountPaise Int?
+  validFrom        DateTime?
+  validTo          DateTime?
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  offers Offer[]
+
+  @@map("promo_code")
+}
+
+model Offer {
+  id            String            @id @default(uuid()) @db.Uuid
+  title         String
+  description   String
+  discountLabel String?
+  packageId     String?           @db.Uuid
+  package       Package?          @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  promoCodeId   String?           @db.Uuid
+  promoCode     PromoCode?        @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  validFrom     DateTime?
+  validTo       DateTime?
+  status        PublicationStatus @default(DRAFT)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([status, sortOrder])
+  @@map("offer")
+}
+
+// ─── Enquiries ───────────────────────────────────────────────────────────────
+
+enum EnquiryType {
+  CONTACT
+  PACKAGE
+  CUSTOM_TRIP
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  QUOTE_PREPARATION
+  QUOTE_SENT
+  CONFIRMED
+  CLOSED
+  SPAM
+}
+
+enum EstimateStatus {
+  ESTIMATED
+  QUOTE_REQUIRED
+  NOT_APPLICABLE
+}
+
+model Enquiry {
+  id                      String         @id @default(uuid()) @db.Uuid
+  /// Human-readable reference shown to the customer, e.g. SWZ-2610-7K3QX.
+  reference               String         @unique
+  /// Client-generated id per form instance; makes double submissions return the same enquiry.
+  submissionKey           String?        @unique
+  type                    EnquiryType
+  status                  EnquiryStatus  @default(NEW)
+  customerName            String
+  email                   String
+  phone                   String?
+  message                 String?
+  packageId               String?        @db.Uuid
+  package                 Package?       @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  travelStartDate         DateTime?      @db.Date
+  travelMonth             String?
+  durationDays            Int?
+  adults                  Int?
+  children                Int?
+  accommodationPreference String?
+  transportPreference     String?
+  interests               String[]
+  budget                  String?
+  promoCode               String?
+  estimateStatus          EstimateStatus @default(NOT_APPLICABLE)
+  estimateTotalPaise      Int?
+  currency                String         @default("INR")
+  /// Durable snapshot of the original submission and the server-computed estimate.
+  snapshot                Json
+  consentAt               DateTime
+  sourcePage              String?
+  /// HMAC of the submitter IP, only for abuse investigation. Never the raw IP.
+  ipHash                  String?
+  assigneeId              String?        @db.Uuid
+  assignee                User?          @relation("EnquiryAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  followUpAt              DateTime?
+  archivedAt              DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  destinations  EnquiryDestination[]
+  notes         EnquiryNote[]
+  statusHistory EnquiryStatusHistory[]
+  emails        EmailDelivery[]
+
+  @@index([status, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
+  @@index([email])
+  @@index([followUpAt])
+  @@map("enquiry")
+}
+
+model EnquiryDestination {
+  id            String       @id @default(uuid()) @db.Uuid
+  enquiryId     String       @db.Uuid
+  enquiry       Enquiry      @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  destinationId String?      @db.Uuid
+  destination   Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  nameSnapshot  String
+  position      Int
+  days          Int
+
+  @@unique([enquiryId, position])
+  @@index([destinationId])
+  @@map("enquiry_destination")
+}
+
+model EnquiryNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  enquiryId String   @db.Uuid
+  enquiry   Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  authorId  String?  @db.Uuid
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
+  @@map("enquiry_note")
+}
+
+model EnquiryStatusHistory {
+  id          String         @id @default(uuid()) @db.Uuid
+  enquiryId   String         @db.Uuid
+  enquiry     Enquiry        @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  fromStatus  EnquiryStatus?
+  toStatus    EnquiryStatus
+  changedById String?        @db.Uuid
+  changedBy   User?          @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  note        String?
+  createdAt   DateTime       @default(now())
+
+  @@index([enquiryId, createdAt])
+  @@map("enquiry_status_history")
+}
+
+// ─── Email outbox ────────────────────────────────────────────────────────────
+
+enum EmailKind {
+  INTERNAL_NOTIFICATION
+  CUSTOMER_ACKNOWLEDGEMENT
+  PASSWORD_RESET
+  DELIVERY_FAILURE_ALERT
+  TEST
+}
+
+enum EmailStatus {
+  PENDING // waiting for its next attempt
+  SENDING // claimed by a worker (lease in lockedUntil)
+  SENT
+  FAILED // gave up after maxAttempts or a permanent error; staff can retry
+  CANCELLED
+}
+
+/// Durable outbox row. Rendered content is stored so retries send exactly what was queued.
+model EmailDelivery {
+  id                String         @id @default(uuid()) @db.Uuid
+  idempotencyKey    String         @unique
+  kind              EmailKind
+  enquiryId         String?        @db.Uuid
+  enquiry           Enquiry?       @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  toAddress         String
+  replyTo           String?
+  subject           String
+  html              String
+  text              String
+  status            EmailStatus    @default(PENDING)
+  attempts          Int            @default(0)
+  maxAttempts       Int            @default(6)
+  nextAttemptAt     DateTime       @default(now())
+  lockedUntil       DateTime?
+  /// Do not send after this time (used for time-sensitive mail such as password resets).
+  expiresAt         DateTime?
+  lastErrorCode     String?
+  lastErrorMessage  String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  attemptLog EmailDeliveryAttempt[]
+
+  @@index([status, nextAttemptAt])
+  @@index([enquiryId])
+  @@map("email_delivery")
+}
+
+enum AttemptOutcome {
+  SUCCESS
+  RETRYABLE_ERROR
+  PERMANENT_ERROR
+  NOT_CONFIGURED
+}
+
+model EmailDeliveryAttempt {
+  id            String         @id @default(uuid()) @db.Uuid
+  deliveryId    String         @db.Uuid
+  delivery      EmailDelivery  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  outcome       AttemptOutcome
+  errorCode     String?
+  errorMessage  String?
+  startedAt     DateTime
+  finishedAt    DateTime       @default(now())
+
+  @@index([deliveryId, attemptNumber])
+  @@map("email_delivery_attempt")
+}
+
+enum CredentialStatus {
+  ACTIVE
+  REVOKED // Google returned invalid_grant: consent revoked or token expired
+  ERROR
+}
+
+/// Gmail OAuth connection created through /admin/email-settings. The refresh token is
+/// encrypted (AES-256-GCM) with a key derived from AUTH_SECRET. Single row, id = "default".
+model GmailCredential {
+  id                    String           @id
+  senderAddress         String
+  encryptedRefreshToken String
+  scope                 String
+  status                CredentialStatus @default(ACTIVE)
+  connectedById         String?          @db.Uuid
+  connectedAt           DateTime         @default(now())
+  lastSuccessAt         DateTime?
+  lastErrorAt           DateTime?
+  lastError             String?
+  updatedAt             DateTime         @updatedAt
+
+  @@map("gmail_credential")
+}
+
+// ─── Content ─────────────────────────────────────────────────────────────────
+
+/// Keyed JSON settings/content blocks validated by zod schemas in src/domain/settings.ts.
+model SiteSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @db.Uuid
+  updatedAt   DateTime @updatedAt
+
+  @@map("site_setting")
+}
+
+model Testimonial {
+  id               String            @id @default(uuid()) @db.Uuid
+  authorName       String
+  location         String?
+  quote            String
+  rating           Int?
+  source           String?
+  /// Staff confirm the review is genuine and the guest agreed to publication.
+  consentConfirmed Boolean           @default(false)
+  status           PublicationStatus @default(DRAFT)
+  sortOrder        Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status, sortOrder])
+  @@map("testimonial")
+}
+
+model Faq {
+  id        String            @id @default(uuid()) @db.Uuid
+  question  String
+  answer    String
+  status    PublicationStatus @default(DRAFT)
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([status, sortOrder])
+  @@map("faq")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}

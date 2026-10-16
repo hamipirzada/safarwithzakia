@@ -1,0 +1,51 @@
+# Production-style stack for a single server (VPS). See docs/DEPLOYMENT.md.
+#   cp .env.example .env.production   # fill in real values
+#   docker compose --env-file .env.production up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-safar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-safar}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-safar}"]
+      interval: 10s
+      retries: 10
+
+  # Applies pending migrations, then exits. Also used for one-off admin commands:
+  #   docker compose run --rm migrate npx tsx scripts/create-admin.ts --email you@example.com --name "You"
+  migrate:
+    build: { context: ., target: builder }
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    build: { context: ., target: runner }
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env.production}
+    ports:
+      - "127.0.0.1:3000:3000" # put a TLS-terminating reverse proxy (Caddy/nginx) in front
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # Sends queued emails every 30 seconds by calling the authenticated worker endpoint.
+  email-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    environment:
+      EMAIL_WORKER_SECRET: ${EMAIL_WORKER_SECRET:?set EMAIL_WORKER_SECRET}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'while true; do curl -fsS -m 55 -X POST -H "Authorization: Bearer $$EMAIL_WORKER_SECRET" http://app:3000/api/cron/email-outbox >/dev/null || echo "email worker call failed"; sleep 30; done'
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
