@@ -83,14 +83,14 @@ git pull && docker compose --env-file .env.production up -d --build
    curl -fsS -X POST -H "Authorization: Bearer $EMAIL_WORKER_SECRET" https://your-domain/api/cron/email-outbox
    ```
    On a paid plan, the `vercel.json` schedule can instead be `*/5 * * * *`. Emails are also attempted immediately after each submission, so the scheduler is only the safety net for retries.
-6. **Region:** `vercel.json` pins functions to Mumbai (`bom1`); create the database in Mumbai (ap-south-1) too.
+6. **Region:** Neon has no Mumbai region, so the database is in Singapore (aws-ap-southeast-1) and `vercel.json` pins functions to Singapore (`sin1`) next to it. Keep the two in the same region.
 
 ### Zero-cost setup
 
 | Piece | Free option | Limits to know |
 |---|---|---|
 | Hosting | Vercel Hobby | Vercel's terms restrict Hobby to non-commercial use; a business site may need Pro later. Daily cron only. |
-| Database | Neon Free (Mumbai, pooled URL) | 0.5 GB storage; sleeps when idle, first request after a pause takes ~1 s. |
+| Database | Neon Free via the Vercel integration (Singapore, pooled URL) | 1 GB storage; sleeps when idle, first request after a pause takes ~1 s. |
 | Frequent email retries | cron-job.org (free) | Calls the endpoint every 5 minutes. |
 | Email | Gmail API with the business mailbox | Free; Gmail sending limits apply. |
 | Address | `your-project.vercel.app` | A custom domain is only needed if you want one (an existing domain can be pointed at Vercel for free). |
